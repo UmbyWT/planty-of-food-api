@@ -1,0 +1,37 @@
+# Database MySQL 8 pronto all'uso per sviluppo e test. Non contiene l'API: quella si avvia
+# con `npm start` (vedi README).
+#
+#   docker compose up -d
+#
+# Al primo avvio crea il database `pof` con la struttura di db/migrations.sql e, a parte,
+# il database `pof_test` per i test di integrazione. I valori coincidono con .env.example.
+# I dati restano nel volume `pof-data` anche dopo `docker compose down`;
+# `docker compose down -v` li cancella.
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: pof-mysql
+    restart: unless-stopped
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: pof
+      MYSQL_USER: pof
+      MYSQL_PASSWORD: pof_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - pof-data:/var/lib/mysql
+      # Gli script in questa cartella girano una volta sola, in ordine alfabetico,
+      # solo quando il volume è vuoto.
+      - ./docker/01-test-database.sql:/docker-entrypoint-initdb.d/01-test-database.sql:ro
+      - ./db/migrations.sql:/docker-entrypoint-initdb.d/02-migrations.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  pof-data:
