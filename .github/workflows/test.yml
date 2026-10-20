@@ -1,0 +1,58 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # Un MySQL 8 vero, lo stesso di docker-compose.yml. L'utente `pof` ha i permessi
+    # sul database `pof_test`, che MYSQL_DATABASE crea all'avvio.
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root_password
+          MYSQL_DATABASE: pof_test
+          MYSQL_USER: pof
+          MYSQL_PASSWORD: pof_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_password --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: pof
+      DB_PASSWORD: pof_password
+      DB_NAME: pof
+      TEST_DB_NAME: pof_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Test unitari
+        run: npm test
+
+      - name: Test di integrazione (MySQL 8)
+        run: npm run test:integration
+
+      # Stessi test con il processo in un fuso orario diverso da UTC: servono a
+      # scoprire se da qualche parte le date dipendono dal fuso della macchina.
+      - name: Test di integrazione con fuso orario diverso
+        run: npm run test:integration
+        env:
+          TZ: Asia/Kolkata
