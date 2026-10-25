@@ -36,9 +36,10 @@ describe('orderService', () => {
         createdBefore: new Date('2026-10-21T00:00:00.000Z'),
         productIds: [3, 5],
       };
-      orderRepository.findAll.resolves([savedOrder]);
+      const paginated = { total: 1, orders: [savedOrder] };
+      orderRepository.findAll.resolves(paginated);
 
-      assert.deepEqual(await service.list(filters), [savedOrder]);
+      assert.deepEqual(await service.list(filters), paginated);
       sinon.assert.calledOnceWithExactly(orderRepository.findAll, filters);
     });
   });

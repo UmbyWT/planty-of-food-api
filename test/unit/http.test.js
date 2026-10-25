@@ -316,13 +316,13 @@ describe('API HTTP', () => {
     });
 
     it('GET /orders senza filtri chiede tutto al service', async () => {
-      orderService.list.resolves([order]);
+      orderService.list.resolves({ total: 1, orders: [order] });
 
       const res = await api.get('/orders');
 
       assert.equal(res.status, 200);
-      assert.deepEqual(res.body, [order]);
-      sinon.assert.calledOnceWithExactly(orderService.list, {});
+      assert.deepEqual(res.body, { total: 1, orders: [order] });
+      sinon.assert.calledOnceWithExactly(orderService.list, { limit: 20, offset: 0 });
     });
 
     it('GET /orders?date=... passa un intervallo di un giorno in UTC', async () => {
@@ -334,6 +334,8 @@ describe('API HTTP', () => {
       assert.deepEqual(filters, {
         createdFrom: new Date('2026-10-20T00:00:00.000Z'),
         createdBefore: new Date('2026-10-21T00:00:00.000Z'),
+        limit: 20,
+        offset: 0,
       });
     });
 
@@ -345,6 +347,8 @@ describe('API HTTP', () => {
       assert.deepEqual(orderService.list.firstCall.args[0], {
         createdFrom: new Date('2026-10-01T00:00:00.000Z'),
         productIds: [3, 5, 8],
+        limit: 20,
+        offset: 0,
       });
     });
 

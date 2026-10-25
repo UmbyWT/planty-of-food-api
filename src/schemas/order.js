@@ -45,12 +45,34 @@ const productIdFilter = z
   .transform((value) => [value].flat().flatMap((piece) => piece.split(',')))
   .pipe(z.array(idFromText));
 
+// ---- paginazione --------------------------------------------------------------------------
+
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 100;
+
+const limitParam = z
+  .string()
+  .regex(/^[1-9]\d*$/, 'limit deve essere un numero intero positivo.')
+  .transform(Number)
+  .refine((n) => n <= MAX_LIMIT, `limit può essere al massimo ${MAX_LIMIT}.`)
+  .optional()
+  .default(DEFAULT_LIMIT);
+
+const offsetParam = z
+  .string()
+  .regex(/^\d+$/, 'offset deve essere un numero intero non negativo.')
+  .transform(Number)
+  .optional()
+  .default(0);
+
 const orderQuery = z
   .strictObject({
     date: day.optional(),
     from: day.optional(),
     to: day.optional(),
     productId: productIdFilter.optional(),
+    limit: limitParam,
+    offset: offsetParam,
   })
   .refine((query) => !(query.date && (query.from || query.to)), {
     message: "Usa 'date' da solo, oppure 'from' e 'to': insieme non hanno senso.",
@@ -74,6 +96,8 @@ const orderQuery = z
       filters.createdBefore = before;
     }
     if (query.productId) filters.productIds = [...new Set(query.productId)];
+    filters.limit = query.limit;
+    filters.offset = query.offset;
     return filters;
   });
 

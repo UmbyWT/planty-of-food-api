@@ -82,9 +82,10 @@ function translateReferenceError(error) {
 
 function createOrderRepository(pool) {
   return {
-    // filters: { createdFrom?: Date (incluso), createdBefore?: Date (escluso), productIds?: number[] }
+    // filters: { createdFrom?, createdBefore?, productIds?, limit, offset }
     // Con più productIds basta che l'ordine ne contenga uno.
-    // I pezzi di SQL aggiunti qui sono tutti costanti; i valori passano solo dai parametri.
+    // Il LIMIT si applica alla prima query (sugli ordini), così la IN successiva
+    // non supera mai quel numero e il client può paginare.
     async findAll(filters = {}) {
       const conditions = [];
       const params = [];
@@ -107,11 +108,23 @@ function createOrderRepository(pool) {
       }
 
       const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-      const [rows] = await pool.execute(
-        `SELECT o.id, o.created_at FROM orders o ${where} ORDER BY o.created_at DESC, o.id DESC`,
+
+      // Conto il totale per la paginazione lato client.
+      const [[{ total }]] = await pool.execute(
+        `SELECT COUNT(*) AS total FROM orders o ${where}`,
         params,
       );
-      return loadOrders(pool, rows);
+
+      const limit = filters.limit ?? 20;
+      const offset = filters.offset ?? 0;
+
+      const [rows] = await pool.execute(
+        `SELECT o.id, o.created_at FROM orders o ${where} ORDER BY o.created_at DESC, o.id DESC LIMIT ? OFFSET ?`,
+        [...params, limit, offset],
+      );
+
+      const orders = await loadOrders(pool, rows);
+      return { total, orders };
     },
 
     async findById(id) {

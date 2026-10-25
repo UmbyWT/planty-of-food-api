@@ -44,7 +44,7 @@ describe('GET /orders, filtri con il database vero', () => {
     const res = await ctx.api().get('/orders').query(query);
     assert.equal(res.status, 200, JSON.stringify(res.body));
     const byId = Object.fromEntries(Object.entries(orders).map(([letter, id]) => [id, letter]));
-    return res.body.map((order) => byId[order.id]).join('');
+    return res.body.orders.map((order) => byId[order.id]).join('');
   }
 
   it('senza filtri restituisce tutto, dal più recente al più vecchio', async () => {
@@ -92,7 +92,7 @@ describe('GET /orders, filtri con il database vero', () => {
 
     it('l\'ordine trovato mostra comunque tutti i suoi prodotti, non solo quello cercato', async () => {
       const res = await ctx.api().get('/orders').query({ productId: products.farro });
-      const orderE = res.body.find((order) => order.id === orders.E);
+      const orderE = res.body.orders.find((order) => order.id === orders.E);
 
       assert.deepEqual(
         orderE.products.map((product) => product.name),
@@ -141,7 +141,7 @@ describe('GET /orders, filtri con il database vero', () => {
 
       const res = await ctx.api().get('/orders').query({ productId: segale });
 
-      assert.deepEqual(res.body.map((order) => order.id), [second, first]);
+      assert.deepEqual(res.body.orders.map((order) => order.id), [second, first]);
     });
   });
 
@@ -152,12 +152,56 @@ describe('GET /orders, filtri con il database vero', () => {
       assert.equal(res.body.createdAt, '2026-10-20T23:59:59.999Z');
     });
 
-    it('ogni ordine ha id, createdAt, products e users', async () => {
+    it('ogni ordine ha id, createdAt, products e users e la risposta contiene total', async () => {
       const { body } = await ctx.api().get('/orders').query({ date: '2026-10-20' });
 
-      for (const order of body) {
+      assert.equal(typeof body.total, 'number');
+      assert.ok(Array.isArray(body.orders));
+      for (const order of body.orders) {
         assert.deepEqual(Object.keys(order).sort(), ['createdAt', 'id', 'products', 'users']);
       }
+    });
+  });
+
+  describe('paginazione', () => {
+    it('limit e offset controllano la pagina e total conta tutti gli ordini', async () => {
+      const res = await ctx.api().get('/orders').query({ limit: 2, offset: 0 });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.total, 6);
+      assert.equal(res.body.orders.length, 2);
+      // I primi due sono F ed E (i più recenti).
+      const byId = Object.fromEntries(Object.entries(orders).map(([letter, id]) => [id, letter]));
+      assert.equal(res.body.orders.map((o) => byId[o.id]).join(''), 'FE');
+    });
+
+    it('la seconda pagina mostra gli ordini successivi', async () => {
+      const res = await ctx.api().get('/orders').query({ limit: 2, offset: 2 });
+
+      assert.equal(res.body.total, 6);
+      assert.equal(res.body.orders.length, 2);
+      const byId = Object.fromEntries(Object.entries(orders).map(([letter, id]) => [id, letter]));
+      assert.equal(res.body.orders.map((o) => byId[o.id]).join(''), 'DC');
+    });
+
+    it('offset oltre il totale dà un elenco vuoto ma il totale giusto', async () => {
+      const res = await ctx.api().get('/orders').query({ limit: 20, offset: 100 });
+
+      assert.equal(res.body.total, 6);
+      assert.equal(res.body.orders.length, 0);
+    });
+
+    it('limit oltre 100 dà 400', async () => {
+      const res = await ctx.api().get('/orders').query({ limit: 101 });
+
+      assert.equal(res.status, 400);
+    });
+
+    it('paginazione combinata con filtri', async () => {
+      const res = await ctx.api().get('/orders').query({ date: '2026-10-20', limit: 2, offset: 0 });
+
+      assert.equal(res.body.total, 3);
+      assert.equal(res.body.orders.length, 2);
     });
   });
 

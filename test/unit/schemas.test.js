@@ -181,27 +181,31 @@ describe('schema del corpo di un ordine', () => {
 describe('schema dei filtri di GET /orders', () => {
   const parse = (query) => orderQuery.safeParse(query);
   const utc = (iso) => new Date(`${iso}Z`);
+  const pagination = { limit: 20, offset: 0 };
 
   it('senza parametri non produce nessun filtro', () => {
-    assert.deepEqual(parse({}).data, {});
+    assert.deepEqual(parse({}).data, { ...pagination });
   });
 
   it('date copre un solo giorno: da mezzanotte a mezzanotte (UTC)', () => {
     assert.deepEqual(parse({ date: '2026-10-20' }).data, {
       createdFrom: utc('2026-10-20T00:00:00.000'),
       createdBefore: utc('2026-10-21T00:00:00.000'),
+      ...pagination,
     });
   });
 
   it('to include l\'intero giorno indicato', () => {
     assert.deepEqual(parse({ to: '2026-10-20' }).data, {
       createdBefore: utc('2026-10-21T00:00:00.000'),
+      ...pagination,
     });
   });
 
   it('from da solo fissa solo l\'inizio', () => {
     assert.deepEqual(parse({ from: '2026-10-01' }).data, {
       createdFrom: utc('2026-10-01T00:00:00.000'),
+      ...pagination,
     });
   });
 
@@ -209,6 +213,7 @@ describe('schema dei filtri di GET /orders', () => {
     assert.deepEqual(parse({ from: '2026-10-01', to: '2026-10-31' }).data, {
       createdFrom: utc('2026-10-01T00:00:00.000'),
       createdBefore: utc('2026-11-01T00:00:00.000'),
+      ...pagination,
     });
   });
 
@@ -216,6 +221,7 @@ describe('schema dei filtri di GET /orders', () => {
     assert.deepEqual(parse({ from: '2026-10-20', to: '2026-10-20' }).data, {
       createdFrom: utc('2026-10-20T00:00:00.000'),
       createdBefore: utc('2026-10-21T00:00:00.000'),
+      ...pagination,
     });
   });
 
@@ -261,19 +267,19 @@ describe('schema dei filtri di GET /orders', () => {
   });
 
   it('productId: un id solo', () => {
-    assert.deepEqual(parse({ productId: '3' }).data, { productIds: [3] });
+    assert.deepEqual(parse({ productId: '3' }).data, { productIds: [3], ...pagination });
   });
 
   it('productId: parametro ripetuto, che Express consegna come array', () => {
-    assert.deepEqual(parse({ productId: ['3', '5'] }).data, { productIds: [3, 5] });
+    assert.deepEqual(parse({ productId: ['3', '5'] }).data, { productIds: [3, 5], ...pagination });
   });
 
   it('productId: elenco separato da virgole', () => {
-    assert.deepEqual(parse({ productId: '3,5,8' }).data, { productIds: [3, 5, 8] });
+    assert.deepEqual(parse({ productId: '3,5,8' }).data, { productIds: [3, 5, 8], ...pagination });
   });
 
   it('productId: le due forme insieme, senza doppioni', () => {
-    assert.deepEqual(parse({ productId: ['3,5', '5', '8'] }).data, { productIds: [3, 5, 8] });
+    assert.deepEqual(parse({ productId: ['3,5', '5', '8'] }).data, { productIds: [3, 5, 8], ...pagination });
   });
 
   for (const bad of ['', '3,', ',3', '3,,5', 'abc', '3 OR 1=1', '1 UNION SELECT 1', '0', '-2', '1.5', "3'"]) {
@@ -297,6 +303,7 @@ describe('schema dei filtri di GET /orders', () => {
       createdFrom: utc('2026-10-20T00:00:00.000'),
       createdBefore: utc('2026-10-21T00:00:00.000'),
       productIds: [2, 4],
+      ...pagination,
     });
   });
 });
